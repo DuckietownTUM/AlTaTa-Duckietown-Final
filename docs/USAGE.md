@@ -35,6 +35,12 @@ Red lines have a two-second dwell. When its future queue is empty, live chat
 asks for a direction and waits up to 60 seconds from arrival. Map-only mode
 ends at its destination. See [LIVE_CHAT](LIVE_CHAT.md) for all commands.
 
+During a left junction turn, a stable partial outgoing lane can end the fixed
+turn and begin camera-guided alignment. This does not yet complete the turn:
+near-field lane support and alignment must still be confirmed before the app
+advances its reported position. Losing guidance after visual alignment begins
+stops the maneuver instead of restarting the fixed turn.
+
 ## Finish and recover
 
 **STOP DUCK2** or `quit` ends the run and cancels automatic resume. Closing the

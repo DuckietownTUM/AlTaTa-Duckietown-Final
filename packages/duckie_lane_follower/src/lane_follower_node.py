@@ -3014,12 +3014,13 @@ class LaneFollowerNode(DTROS):
     def left_junction_visual_entry(self, now):
         """Leave the fixed arc on stable outgoing evidence, then keep aligning.
 
-        A mid-field corridor may be visible before the near yellow dash. Entry
-        needs ordered rows and a plausible heading; full route acceptance still
-        requires near-field centering, heading and the original stability time.
+        A partial outgoing corridor can appear to the right while the fixed
+        left arc is still running. Use it to start visual alignment before the
+        arc sweeps past it. Partial evidence needs longer confirmation and
+        never counts as completed near-field lane reacquisition.
         """
         geometry = self._junction_lane_geometry
-        candidate = bool(
+        full_candidate = bool(
             self._departed_red and self.junction_geometry_steering_valid(geometry)
             and geometry.get("pair_count", 0) >= 3
             and geometry.get("row_span", 0.0) >= 0.36 - 1e-9
@@ -3027,11 +3028,26 @@ class LaneFollowerNode(DTROS):
             and geometry["pairs"][-1]["row_fraction"] >= 0.54
             and abs(geometry["lateral_error"]) < 0.25
             and abs(geometry["heading_error"]) < 0.15)
+        partial_candidate = bool(
+            self.navigation_state == "reacquiring" and self._departed_red
+            and self.junction_geometry_steering_valid(geometry)
+            and geometry.get("pair_count", 0) >= 2
+            and geometry.get("row_span", 0.0) >= 0.18 - 1e-9
+            and geometry.get("pairs")
+            and geometry["pairs"][-1]["row_fraction"] >= 0.36
+            and abs(geometry["lateral_error"]) < 0.45
+            and abs(geometry["heading_error"]) < 0.15
+            and all(0.15 * geometry["image_width"] <= p["white_x"] - p["yellow_x"]
+                    <= 0.95 * geometry["image_width"] for p in geometry["pairs"])
+            and all(b["width"] >= a["width"] - 0.12 * geometry["image_width"]
+                    and abs(b["center_x"] - a["center_x"]) <= 0.12 * geometry["image_width"]
+                    for a, b in zip(geometry["pairs"], geometry["pairs"][1:])))
         if not self._junction_left_visual_entry:
-            if candidate:
+            if full_candidate or partial_candidate:
                 if self._junction_left_corridor_since is None:
                     self._junction_left_corridor_since = now
-                elif now - self._junction_left_corridor_since >= 0.10 - 1e-9:
+                elif now - self._junction_left_corridor_since >= (
+                        0.10 if full_candidate else 0.30) - 1e-9:
                     self._junction_left_visual_entry = True
                     self.reset_steering()
             else:

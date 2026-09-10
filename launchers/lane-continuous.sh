@@ -52,7 +52,7 @@ rosrun duckie_lane_follower lane_follower_node.py \
     _junction_straight_encoder_balance_gain:=0.12 \
     _junction_straight_encoder_balance_max:=0.015 \
     _junction_straight_encoder_balance_min_ticks:=12.0 \
-    _junction_left_speed:=0.115 _junction_left_bias:=0.085 \
+    _junction_left_speed:=0.09 _junction_left_bias:=0.06 \
     _junction_right_speed:=0.10 _junction_right_bias:=0.10 \
     _junction_right_tracking_trim:=0.0 _junction_right_encoder_assist:=true \
     _sharp_corner_enabled:=true _sharp_corner_confirm_seconds:=0.20 \
