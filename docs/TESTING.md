@@ -1,5 +1,43 @@
 # Testing status
 
+## 2026-09-10 — normal live-chat release and review
+
+**Latest physical result: incomplete.** The user reports that duck2 did not
+curve enough and stopped. This is not accepted full-route validation. No new
+physical movement or calibration change was made during this release review.
+
+The normal companion enables live chat by default: selected map turns seed
+the queue, messages change future junction choices, timed pauses take effect
+on robot acceptance, and straight-road speed profiles remain separate from
+curve and junction profiles. When the queue ends, the bot stops at a red line,
+asks for a direction and waits up to 60 seconds. Optional scenario restrictions
+do not apply to the normal launcher. Initial-straight centering remains opt-in
+for the explicitly placed straight-path check.
+
+Review fixes: reconnect is blocked during Start; background connection errors
+cannot unlock a second Start while the first remains pending; a queued Start
+result cannot replace the UI's Stop outcome. Final lane reporting reconciles
+only an acknowledged instruction with matching outgoing lane, index and turn.
+Camera HTTP failures are distinguished from network timeouts, and invalid
+capture timestamps are rejected. The preview's session-free detector helper
+is included in this release, fixing its earlier frame-processing exception.
+
+Verification: 562 native tests completed, with 559 passing and three platform
+skips; 80 Python sources, documentation links and Windows launcher targets
+passed inspection. Network-isolated HTTP/ROS checks passed real normal/mask/
+overlay delivery, all speed profiles, immediate zero, a measured 7.093-second
+synthetic pause/resume interval, final-red stopping, scenario isolation, and
+the normal map queue → straight override → C red prompt → left instruction →
+Stop sequence. These are synthetic wheel requests and software observations,
+not measurements of track containment. Source and PDF include all three authors.
+The broader disposable ROS suite also passed (71 prerequisite tests plus its
+real ROS transport checks), including red dwell, route progress, heartbeat loss,
+camera loss, pause/resume and Stop. Its local evidence is retained outside Git
+under bench-checks run `20260910T185021Z-b9ce8a35`.
+
+The earlier dated sections below retain diagnostic history; the current
+entry points are [STARTUP](STARTUP.md), [USAGE](USAGE.md) and [LIVE_CHAT](LIVE_CHAT.md).
+
 ## 2026-09-10 — test workflow ended; companion app restored
 
 At the user's request, removed the experimental paired road-path controller and

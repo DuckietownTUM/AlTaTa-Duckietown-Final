@@ -80,10 +80,14 @@ def follow_turn(approach, turn):
 
 
 class LiveChatSession:
-    def __init__(self, start, turns=(), run_id=None, stop_at_next_red=False, finish_approach=None):
+    def __init__(self, start, turns=(), run_id=None, stop_at_next_red=False, finish_approach=None, stop_after_junction=False,
+                 finish_after_junction_red=False, center_initial_straight=False):
         parse_approach(start)
         self.run_id = run_id or str(uuid.uuid4())
         self.stop_at_next_red = stop_at_next_red
+        self.stop_after_junction = stop_after_junction
+        self.finish_after_junction_red = finish_after_junction_red
+        self.center_initial_straight = center_initial_straight
         self.finish_approach = (approach_id(*parse_approach(finish_approach))
                                 if finish_approach is not None else None)
         self.approach = start
@@ -105,6 +109,10 @@ class LiveChatSession:
         if self.inflight and not self.inflight["accepted"]:
             raise ValueError("The last instruction has an unknown outcome; wait for fresh robot status.")
         proposed = (list(self.queue) if append else []) + list(turns)
+        if self.stop_after_junction and (self.inflight or proposed not in ([], ["straight"])):
+            raise ValueError("This check permits one straight crossing only.")
+        if self.finish_after_junction_red and (len(proposed) > 1 or self.inflight or self.index > 1):
+            raise ValueError("This run ends at the red line after one junction; edit its turn before departure.")
         if len(proposed) > 30:
             raise ValueError("Use at most 30 future turns")
         location = self.inflight["outgoing"] if self.inflight else self.approach
@@ -127,6 +135,18 @@ class LiveChatSession:
             raise ValueError("Robot session differs from this laptop's queue; confirm placement and Start again.")
         self.confirmed = True
         if not live.get("active"):
+            # Robot-side completion can arrive before the next queue poll.
+            # Accept only the outgoing edge of our own completed instruction.
+            result = status.get("junction_last_result") or {}
+            if (self.inflight
+                    and live.get("instruction_id") == self.inflight["id"]
+                    and status.get("route_index") == self.index + 1
+                    and status.get("current_approach") == self.inflight["outgoing"]
+                    and result.get("route_index") == self.index + 1
+                    and result.get("turn") == self.inflight["turn"]
+                    and result.get("outcome") in ("reacquired", "reacquired_at_next_red")):
+                self.approach = self.inflight["outgoing"]
+                self.index += 1
             self.cancel()
             self.notices.append(live.get("end_reason") or "Run ended on the robot.")
             return

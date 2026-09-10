@@ -21,6 +21,90 @@ class FreshChatScenarioTests(unittest.TestCase):
     command = fixtures.LiveNavigationTests.command
     managed = fixtures.LiveNavigationTests.managed
 
+    def test_single_straight_crossing_pauses_and_stops_on_robot_without_laptop_polling(self):
+        with patch.object(socket, 'socket', side_effect=AssertionError('Robot networking forbidden')):
+            n = self.managed(['A', 'E'])
+            self.command('stop')
+            ack = self.command('set_route', route=['A', 'E'], position_confirmed=True,
+                               managed_session=True, stop_after_junction=True)
+            self.assertTrue(ack['accepted'], ack)
+            self.assertTrue(self.command('continue')['accepted'])
+            laptop = LiveChatSession('A->E', ['straight'], run_id='test', stop_after_junction=True)
+            case = self
+            class Link:
+                def send(self, action, command_id=None, **kwargs):
+                    if command_id is not None:
+                        kwargs['id'] = command_id
+                    return case.command(action, **kwargs)
+            link = Link()
+            self.assertGreater(sum(self.tick()[:2]), 0)
+            laptop.execute(interpret_live('stop for 7s'), link, n.status())
+            paused = self.now
+            for _ in range(69):
+                self.assertEqual(self.tick(), (0., 0., 0.))
+            self.now = paused + 7.
+            self.assertGreater(sum(self.tick()[:2]), 0)
+            self.tick(red=True)
+            self.tick(red=True, seconds=2.1)
+            self.assertTrue(n.live.active)
+            rejected = self.command('junction_instruction', value='left', approach='A->E',
+                                    expected_route_index=1)
+            self.assertFalse(rejected['accepted'])
+            laptop.service(link, n.status())
+            self.assertEqual(n._active_turn, 'straight')
+            # No laptop service calls after departure: the robot owns completion.
+            for _ in range(20):
+                self.tick(error=None)
+                self.assertTrue(n.live.active)
+                self.assertEqual(n.route_index, 1)
+            for _ in range(100):
+                self.tick()
+                if not n.live.active:
+                    break
+            self.assertFalse(n.live.active)
+            self.assertEqual(n.route_index, 2)
+            self.assertEqual(n.navigation_state, 'route_complete')
+            self.assertEqual(self.speeds(), (0., 0.))
+            self.assertTrue(n.manual_stop)
+            for _ in range(10):
+                self.assertEqual(self.tick(), (0., 0., 0.))
+            self.assertFalse(self.command('continue')['accepted'])
+            self.assertFalse(self.command('resume')['accepted'])
+            laptop.service(link, n.status())
+            self.assertFalse(laptop.active)
+            self.assertEqual(laptop.approach, 'E->C')
+
+    def test_single_crossing_capability_and_queue_are_enforced(self):
+        plan = plan_route('A->E', 'E->C')
+        live = LiveChatSession('A->E', ['straight'], stop_after_junction=True)
+        for turns in (['left'], ['right'], ['straight', 'left']):
+            with self.assertRaises(ValueError):
+                live.replace_turns(turns)
+        value = queue_fixtures.status(live)
+        link = queue_fixtures.Transport(value)
+        with self.assertRaisesRegex(RuntimeError, 'single-crossing'):
+            start_route(link, plan, live_session=live)
+        self.assertEqual(link.calls, [])
+        value['live_session']['supports_stop_after_junction'] = True
+        link = queue_fixtures.Transport(value)
+        start_route(link, plan, live_session=live)
+        self.assertTrue(link.calls[0][1]['stop_after_junction'])
+
+    def test_single_crossing_options_validate_and_fresh_start_resets(self):
+        n = self.managed(['A', 'E'])
+        self.command('stop')
+        for options in ({'stop_after_junction': 'true'},
+                        {'stop_after_junction': True, 'stop_at_next_red': True},
+                        {'stop_after_junction': True, 'finish_approach': 'C->B'}):
+            self.assertFalse(self.command('set_route', route=['A', 'E'],
+                position_confirmed=True, managed_session=True, **options)['accepted'])
+        self.assertTrue(self.command('set_route', route=['A', 'E'],
+            position_confirmed=True, managed_session=True, stop_after_junction=True)['accepted'])
+        self.assertTrue(n.live.stop_after_junction)
+        self.assertTrue(self.command('set_route', route=['A', 'E'],
+            position_confirmed=True, managed_session=True)['accepted'])
+        self.assertFalse(n.live.stop_after_junction)
+
     def tick(self, error=0., red=False, seconds=.1):
         self.now += seconds
         n = self.node

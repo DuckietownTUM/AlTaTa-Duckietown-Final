@@ -30,6 +30,15 @@ def start_route(transport, plan, cancelled=lambda: False, live_session=None):
         if (status.get("live_session") or {}).get("supports_finish_approach") is not True:
             raise RuntimeError("Prepare the updated final-red-line controller before Start")
         options["finish_approach"] = live_session.finish_approach
+    if live_session is not None and live_session.stop_after_junction:
+        if (status.get("live_session") or {}).get("supports_stop_after_junction") is not True:
+            raise RuntimeError("Prepare the single-crossing controller before Start")
+        options["stop_after_junction"] = True
+    if live_session is not None and (live_session.finish_after_junction_red or live_session.center_initial_straight):
+        if (status.get("live_session") or {}).get("supports_initial_straight_check") is not True:
+            raise RuntimeError("Prepare the initial-straight controller before Start")
+        options["finish_after_junction_red"] = live_session.finish_after_junction_red
+        options["center_initial_straight"] = live_session.center_initial_straight
     ack = transport.send(
         "set_route", route=route, map_id=plan.map_id,
         start_approach=plan.start_approach,

@@ -8,6 +8,13 @@ its development and the template investigation.
 
 ## Starting
 
+Use the normal `laptop/Start-Duck2Companion.cmd` for a complete live-chat run.
+Live chat is checked by default. It uses the selected map route as its initial
+queue and allows subsequent supported messages throughout the session.
+No test flag, initial-straight assumption or one-junction limit is active.
+Choosing straight at a junction changes that junction instruction, not the
+lane-following mode on the road after it.
+
 1. Prepare the updated source with `tools/Start-Duck2-DrivingMode.cmd` while
    duck2 is stationary. This uses the existing source-mounted runtime and does
    not require a new Docker Desktop build. It changes robot controller ownership,
@@ -23,6 +30,8 @@ its development and the template investigation.
 The app refuses a live-chat Start if the controller does not advertise the
 new session protocol. Reopen the app and prepare the updated robot source;
 an already running window/container does not reload changed Python files.
+Reconnect is blocked while Start is pending. A background heartbeat/status
+failure does not permit a duplicate Start; use STOP DUCK2 to cancel first.
 
 Unchecking Live chat before Start retains map-only operation, which ends at
 the destination red line. In live-chat mode, that line instead prompts for
@@ -129,6 +138,64 @@ chat message; preparation and isolated tests never send it to the real robot.
 
 ## Live junction override check
 
+### Initial-straight centering and one junction, ending at a red line
+
+Use `laptop/Start-Duck2-InitialStraightChatCheck.cmd` with the newly prepared
+controller. Place duck2 **after the A → E curve, on the straight**. This mode
+explicitly assumes that the starting portion is straight. It selects A → E → B
+and queues left at E; chat input stays blank and the user presses Start.
+Send `stop for 7s` if desired, then `go straight at the next junction` before E.
+The override replaces left with straight, changes the outgoing lane to E → C,
+and the session ends at **C's red line**. With no override, it takes the planned
+left and stops at **B's red line**. No second junction departure is allowed.
+
+Only this mode enables `center_initial_straight`. Before the first junction it
+uses the existing row-matched lane controller from the first frame, without
+seeding steering from ordinary centroid error or trim. The existing alpha=0.20
+filter smooths its requested correction independently of frame rate. When fixed
+image bands fall between yellow dashes, the existing dense-row fit can supply
+observed lane evidence. Gains, target, steering cap, red detection, speed,
+and crossing profiles remain unchanged. After E, the existing crossing and road
+controllers run; the initial-straight option cannot control E → C's curve.
+
+This addresses an identified source of command variation and a late controller
+handoff. It is not proof of the cause of every physical oscillation or a new
+claim of successful containment. Source was backed up outside the repository.
+Verification includes 148 focused native checks covering starting without red,
+centroid jitter, correction signs, smoothing, dash gaps, lost lanes, reset,
+user override, post-junction release, final red stopping and app setup.
+The isolated Noetic HTTP/ROS sequence also passed: 7.068-second pause, left-to-
+straight override, initial approach activation, release after E and final C
+red stop. The source/link/launcher check passed for 80 Python files. These checks
+used synthetic frames and do not validate the physical trajectory.
+Preview follow-up: the initial-straight detector helper must also exist on the
+read-only `LanePreview`, where it returns false because the preview has no live
+driving session. Its omission caused HTTP 503 responses despite fresh controller
+images. Fixed and checked with 34 camera/client/scenario tests and nine live
+normal/mask/overlay frames; timestamps advanced and sampled ages stayed below
+0.13 seconds while duck2 remained stopped.
+
+### Single straight crossing (2026-09-10)
+
+For the shortened scenario, run `laptop/Start-Duck2-StraightCrossingCheck.cmd`
+after preparing driving mode. Start after the curve on A → E. The app selects
+A → E → C with one straight instruction queued and leaves message input empty.
+Confirm placement and click Start yourself. Send `stop for 7s` before reaching E;
+the pause is user-triggered and is not scheduled automatically. At E the usual
+red-line stop and dwell apply, then duck2 crosses straight. The robot ends the
+session with zero output in the same control update that confirms the outgoing
+lane. It does not continue to the E → C curve or the C red line. Left/right and
+multi-turn queues are rejected in this mode. Stop, freshness, ownership,
+stall and crossing-deadline safeguards remain active. This is software lane
+reacquisition; physical alignment and containment still require observation.
+The latest full scenario remains unsuccessful based on rightward drift.
+Verification: 106 focused native tests passed. The isolated, network-disabled
+ROS check verified a 7.060-second timed pause and a separate one-straight-crossing
+session that ended on the robot at reacquisition, rejected late Continue, and
+did not require laptop queue polling after departure. Source/link/launcher
+checks passed. Physical validation of the shorter scenario is pending. Existing
+steering profiles and white-boundary correction were not retuned for this mode.
+
 The user reported the A → E three-second pause scenario successful. For the
 next scenario open `laptop/Start-Duck2-JunctionChatCheck.cmd`, after preparing
 the updated controller while stopped. The launcher opens the same companion
@@ -214,9 +281,11 @@ No live-chat movement was performed as part of this implementation.
 
 ## Latest combined scenario record
 
-The latest 2026-09-10 attempt appeared promising to the user but ended when the
-battery depleted. It remains incomplete, not a successful full-scenario result.
-The source snapshot was preserved outside the repository; see [TESTING](TESTING.md).
+An earlier battery-interrupted attempt remains incomplete. In the latest
+2026-09-10 attempt the user reported insufficient curve following and a stop.
+This remains incomplete, not a successful full-route result. The release review
+verified the normal app's chat flow in isolated ROS without changing physical
+steering presets; see [TESTING](TESTING.md).
 
 ## Confirmed-curve yellow gaps
 

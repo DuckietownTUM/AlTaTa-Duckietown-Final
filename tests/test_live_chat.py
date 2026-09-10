@@ -76,6 +76,23 @@ class LiveLanguageTests(unittest.TestCase):
 
 
 class LiveQueueTests(unittest.TestCase):
+    def test_terminal_status_preserves_only_verified_last_turn(self):
+        for reported_turn in ("right", "left"):
+            with self.subTest(reported_turn=reported_turn):
+                queue = LiveChatSession("A->D", ["right"])
+                value = status(queue)
+                transport = Transport(value)
+                queue.service(transport, value)
+                value.update(state="route_complete", route_index=2, current_approach="D->B",
+                             junction_last_result={"outcome": "reacquired_at_next_red",
+                                                   "turn": reported_turn, "route_index": 2})
+                value["live_session"].update(active=False, instruction_id=queue.inflight["id"],
+                                             end_reason="No junction instruction within 60 seconds of the red stop")
+                queue.observe(value)
+                self.assertFalse(queue.active)
+                self.assertEqual(queue.approach, "D->B" if reported_turn == "right" else "A->D")
+                self.assertEqual(queue.queue, [])
+
     def test_map_validation_all_directed_approaches(self):
         for approach in RED_LINE_APPROACHES:
             previous, junction = parse_approach(approach)

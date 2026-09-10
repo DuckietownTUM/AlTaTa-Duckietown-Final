@@ -8,12 +8,23 @@ The main companion and offline apps need no model API key.
 
 ## After switching on laptop and duck2
 
+Use preparation and the companion from the same checkout. For the submitted
+project, open the `AlTaTa - Duckietown Final` folder; a fresh clone works too.
+Close an old companion before opening updated source. Closing requests Stop.
+
 1. Enable the configured hotspot and allow duck2 2–5 minutes to boot.
 2. Run `tools/Start-Duck2-Check.cmd`. SSH identity and login must pass. Exit 3
    means reachable but normal control is not ready; read its missing-node or
    ownership report. It does not automatically restart services.
 3. Select one mode below. Opening an app/tunnel alone does not restore its
    backend after reboot. Start a physical route only while watching duck2.
+
+The normal `laptop/Start-Duck2Companion.cmd` includes live chat by default;
+special scenario launchers are optional. If the camera says **service reached,
+but no fresh preview**, SSH/HTTP responded but the preview backend has no usable
+frame. Keep the robot stopped and prepare the updated backend. A **connection
+unavailable or timed out** message instead requires checking the robot,
+connection check and SSH tunnel. Neither error calls for changing lane colours.
 
 | Mode | Commands |
 | --- | --- |

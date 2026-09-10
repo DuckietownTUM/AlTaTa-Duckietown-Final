@@ -1,4 +1,4 @@
-"""Focused HTTP/ROS pause check. Run ONLY in a Docker --network none container."""
+"""Live chat and preview integration. Run ONLY in a Docker --network none container."""
 import os
 from pathlib import Path
 import signal
@@ -24,6 +24,7 @@ def main():
     from companion_core import OfflineCompanionSession
     from live_chat import LiveChatSession, interpret_live
     from route_control import start_route
+    from camera_client import CameraClient
 
     root = Path(__file__).resolve().parents[1]
     processes = []
@@ -77,10 +78,19 @@ def main():
         spawn([sys.executable, str(source / 'lane_follower_node.py'),
                '_drive_enabled:=true', '_show_debug:=false', '_route_enabled:=true',
                '_junctions_calibrated:=true', '_require_client_heartbeat:=true',
+               '_junction_straight_visual_approach:=true',
+               '_junction_straight_lateral_gain:=0.25', '_junction_straight_heading_gain:=0.30',
+               '_junction_straight_lane_target_fraction:=0.49',
                '_base_speed:=0.09', '_max_speed:=0.20'])
         spawn([sys.executable, str(source / 'command_gateway.py'), '_listen_host:=127.0.0.1'])
+        spawn([sys.executable, str(source / 'camera_gateway.py'), '_listen_host:=127.0.0.1'])
         transport = RobotTransport()
         wait_for(transport.status)
+        preview = CameraClient()
+        for view in preview.VIEWS:
+            frame = wait_for(lambda: preview.frame(view))
+            assert frame.ppm.startswith(b'P6\n') and frame.age < 1.5
+        print('PASS HTTP/ROS: normal, mask and overlay from real preview gateway', flush=True)
 
         def heartbeat():
             while not finished.wait(.25):
@@ -156,7 +166,104 @@ def main():
                                   expected_control_epoch=value['control_epoch'])['accepted']
         print('PASS HTTP/ROS: configured final red line ends run on robot; late resume rejected', flush=True)
 
+        scene[0] = image
+        wait_for(lambda: not transport.status().get('red_line_detection'))
+        plan.select_start('A->E')
+        plan.select_destination('E->C')
+        live = LiveChatSession('A->E', ['straight'], stop_after_junction=True)
+        start_route(transport, plan.plan, live_session=live)
+        wait_for(lambda: max(transport.status()['wheel_speeds']) > .01)
+        scene[0] = red
+        wait_for(lambda: transport.status()['state'] == 'red_stop')
+        wait_for(lambda: transport.status()['junction_instruction_ready'])
+        live.service(transport, transport.poll_status())
+        wait_for(lambda: transport.status()['state'] == 'crossing')
+        scene[0] = np.zeros_like(image)
+        time.sleep(.8)
+        value = transport.status()
+        assert value['live_session']['active'] and value['route_index'] == 1
+        scene[0] = image
+        # No further chat queue polling: completion is an onboard action.
+        wait_for(lambda: transport.status()['state'] == 'route_complete', 15)
+        value = transport.status()
+        assert value['route_index'] == 2 and value['current_approach'] == 'E->C'
+        assert value['manual_stop'] and value['wheel_speeds'] == [0., 0.]
+        assert not value['live_session']['active']
+        assert value['junction_last_result']['outcome'] == 'reacquired'
+        assert not transport.send('continue')['accepted']
+        print('PASS HTTP/ROS: one straight crossing ends at confirmed outgoing lane; no late Continue', flush=True)
+
+        plan.select_start('A->E')
+        plan.select_destination('E->B')
+        live = LiveChatSession('A->E', plan.plan.turns, center_initial_straight=True,
+                               finish_after_junction_red=True)
+        start_route(transport, plan.plan, live_session=live)
+        wait_for(lambda: transport.status()['junction_approach_active'])
+        assert live.queue == ['left']
+        live.execute(interpret_live('go straight at the next junction'), transport, transport.poll_status())
+        scene[0] = red
+        wait_for(lambda: transport.status()['junction_instruction_ready'])
+        live.service(transport, transport.poll_status())
+        wait_for(lambda: transport.status()['state'] == 'crossing')
+        scene[0] = np.zeros_like(image)
+        time.sleep(.8)
+        scene[0] = image
+        wait_for(lambda: transport.status()['route_index'] == 2, 15)
+        value = transport.status()
+        assert value['state'] == 'following' and value['live_session']['active']
+        assert not value['junction_approach_active']
+        scene[0] = red
+        wait_for(lambda: transport.status()['state'] == 'route_complete')
+        value = transport.status()
+        assert value['wheel_speeds'] == [0., 0.] and not value['live_session']['active']
+        assert value['live_session']['end_reason'] == 'Destination reached at E->C red line'
+        print('PASS HTTP/ROS: initial straight centering, user left-to-straight override, road handoff and C red stop', flush=True)
+
+        # Ordinary companion mode: no scenario finish flags or early-straight
+        # assumption. A map queue can be overridden, then extended at a red stop.
+        scene[0] = image
+        wait_for(lambda: not transport.status().get('red_line_detection'))
+        plan.select_start('A->E')
+        plan.select_destination('B->C')
+        live = LiveChatSession(plan.plan.start_approach, plan.plan.turns)
+        value = start_route(transport, plan.plan, live_session=live)
+        live.observe(value)
+        assert live.queue == ['left', 'right']
+        assert not value['live_session']['center_initial_straight']
+        live.execute(interpret_live('go straight at the next junction'), transport, transport.poll_status())
+        scene[0] = red
+        wait_for(lambda: transport.status()['junction_instruction_ready'])
+        live.service(transport, transport.poll_status())
+        wait_for(lambda: transport.status()['state'] == 'crossing')
+        scene[0] = np.zeros_like(image)
+        time.sleep(.8)
+        scene[0] = image
+        wait_for(lambda: transport.status()['route_index'] == 2, 15)
+        live.observe(transport.status())
+        assert live.approach == 'E->C' and live.active and not live.queue
+        scene[0] = red
+        wait_for(lambda: transport.status()['state'] == 'red_stop')
+        value = transport.status()
+        live.observe(value)
+        assert any('Where should I go next?' in notice for notice in live.take_notices())
+        assert value['wheel_speeds'] == [0., 0.] and value['live_session']['red_wait_seconds'] == 60
+        live.execute(interpret_live('go left'), transport, transport.poll_status())
+        wait_for(lambda: transport.status()['junction_instruction_ready'])
+        live.service(transport, transport.poll_status())
+        wait_for(lambda: transport.status()['state'] == 'crossing')
+        assert transport.status()['active_turn'] == 'left'
+        transport.send('stop')
+        value = wait_for(lambda: (lambda s: s if s['manual_stop'] else None)(transport.status()))
+        live.observe(value)
+        assert not live.active and value['wheel_speeds'] == [0., 0.]
+        assert not transport.send('resume', run_id=live.run_id,
+                                  expected_control_epoch=value['control_epoch'])['accepted']
+        print('PASS HTTP/ROS: normal map queue, straight override, C prompt, left dispatch and terminal Stop', flush=True)
+
     finally:
+        if sys.exc_info()[0] is not None:
+            log.flush()
+            print(Path('/tmp/live-pause-ros.log').read_text()[-6000:], flush=True)
         if transport is not None:
             try:
                 transport.send('stop')

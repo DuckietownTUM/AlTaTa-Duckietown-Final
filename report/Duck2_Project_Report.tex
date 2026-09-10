@@ -246,6 +246,8 @@ startup repeatable after laptop or robot reboots.
 \subsection{Implementation and command flow}
 
 The live chatbot is integrated into the companion's camera/status panel. The
+normal application enables it by default, without a test-scenario launcher or
+an assumption that every starting road is straight. The
 operator types a message and presses Send or Enter; the input is not populated
 with a scripted demonstration. \code{live\_chat.py} normalises text, recognises
 an allowed intent and applies it to the current session. The UI reports actual
@@ -356,14 +358,18 @@ tests exercise the actual controller with mocked ROS, including profile
 isolation, red-stop waiting and Stop priority. These are software checks rather
 than evidence of road containment.
 
-Earlier AMD64 and ARM64 builds used the pinned Noetic base. A focused
-network-isolated HTTP/ROS check passed the three profile requests, immediate
-zero during a pause and stopping at the next red line. In that synthetic
-three-second pause, the observed interval between first zero and resumed wheel
-request was 3.057 seconds. A separate broader ROS run stopped at an existing
-sharp-right assertion before reaching its chat section; that run is not
-reported as a complete pass. The focused test establishes the changed chat
-transport path independently.
+The release review completed 562 native tests: 559 passed and three were
+skipped for platform-specific conditions. Syntax, documentation links and
+launcher targets passed for 80 Python sources. Network-isolated HTTP/ROS checks
+verified all three camera views, each speed profile, immediate pause output,
+and final-red stopping. A requested seven-second pause measured 7.093 seconds
+between zero and resumed synthetic wheel requests. The normal companion flow
+also passed map-queue loading, a straight override, the next red-line prompt,
+a subsequent left instruction, and terminal Stop. These checks used synthetic
+images and no robot connection; they establish command integration rather than
+physical route accuracy.
+The broader isolated ROS suite also passed, covering route progression, red
+dwell, camera and heartbeat loss, pause/resume, and explicit Stop.
 
 \subsection{Robot and track results}
 
@@ -395,10 +401,11 @@ Right junction & Accepted as passable: no boundary crossing, with a visible left
 
 The operator also reported the straight-path live-chat three-second pause
 check successful. Subsequent combined runs exercised the seven-second pause
-and a straight override at the first red line. The latest attempt on
-10 September 2026 appeared promising to the operator but ended because the
-battery depleted. Its source snapshot is preserved and its result remains
-\emph{incomplete}, not a successful end-to-end demonstration.
+and a straight override at the first red line. A battery-interrupted attempt
+remains incomplete. In the latest attempt on 10 September 2026, the operator
+reported insufficient curve following followed by a stop. Consequently,
+complete-route physical validation remains \emph{incomplete}, despite accepted
+component trials and verified command delivery.
 
 Implemented chatbot functionality and accepted individual manoeuvres do not
 establish identical behaviour across a complete route under changing lighting,
@@ -426,11 +433,11 @@ the outgoing corridor is established or its deadline expires.
 The software remains map-relative rather than globally localised. The operator
 must select the actual starting approach. Physically relocating the robot
 requires a new session rather than relying on its previous reported position.
-The final integrated scenario uses the A$\rightarrow$E straight, a seven-second
-chat pause, a straight override at E, lane following toward C, and an operator
-left instruction at C before stopping at the C$\rightarrow$B red line. Its
-software flow is implemented; the battery-interrupted run does not complete
-its physical validation.
+The normal application uses the selected map route as its initial queue and
+permits live overrides at subsequent red stops. Optional scenarios limit a run
+to a pause, a crossing, or a configured final red line. These limits do not
+apply to the ordinary companion. The integrated software flow is implemented;
+the latest curve failure still requires physical follow-up.
 
 \section{Reproducible Operation}
 
@@ -442,8 +449,10 @@ source, establishes exclusive project control and leaves the controller stopped
 awaiting a route. Opening the companion then connects the map, camera and chat.
 Only the operator's confirmed Start begins the session.
 
-The current scenario launcher selects the route and leaves the message box
-empty. The operator types every pause and direction message. Camera-only mode
+Run \code{tools/Start-Duck2-DrivingMode.cmd} while stationary, then
+\code{laptop/Start-Duck2Companion.cmd}. Select the real directed start and a
+red-line destination, connect, confirm placement and press Start. The message
+box is empty; the operator types every pause and direction message. Camera-only mode
 uses a separate driving-disabled backend. Docker Desktop is required for local
 ROS builds and isolated integration tests, but not for this source-mounted
 robot session. Repository startup, usage and live-chat guides document the
@@ -486,8 +495,9 @@ Duckietown, ``Project Templates,'' \emph{Developer Manual}, accessed
 \href{https://docs.duckietown.com/ente/devmanual-software/beginner/dtproject/templates.html}{docs.duckietown.com, Project Templates}.
 
 \bibitem{projectrepo}
-T. Kezdekbayev, ``AlTaTa Duckietown Project,'' software repository, 2026.
-\url{https://github.com/Tair1771/AlTaTa-Duckietown-Project}
+T. Kezdekbayev, A. Mendez Li, and T. K. Erol, ``AlTaTa Duckietown Final,''
+software repository, 2026.
+\href{https://github.com/DuckietownTUM/AlTaTa-Duckietown-Final}{GitHub: DuckietownTUM/AlTaTa-Duckietown-Final}.
 \end{thebibliography}
 
 \end{document}

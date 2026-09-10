@@ -11,12 +11,10 @@ requires no API key or model download.
 
 ## Open the app and connect
 
-Open this project folder in Windows Explorer or Windows PowerShell. On this
-laptop, this independent copy is at
-`C:\Users\tkezd\Desktop\AlTaTa - Duckietown Final`.
-The shortcuts below use files relative to this folder. It contains the current
-project files without the previous repository's Git history or remote settings.
-Changes in the original WSL working copy do not automatically update this copy.
+Open this repository's folder in Windows Explorer or Windows PowerShell.
+The same normal companion works from a Desktop checkout or a Windows-accessible
+WSL checkout. Run preparation and the app from the same updated checkout;
+already running apps and robot containers do not reload edited source files.
 
 1. Enable the configured laptop hotspot, power on duck2 and allow it to boot.
 2. Run `tools/Start-Duck2-Check.cmd`. Unlock the existing Windows SSH key if
@@ -31,7 +29,7 @@ Changes in the original WSL working copy do not automatically update this copy.
 | Map planning, offline | Nothing | `laptop/Start-Duck2Companion.cmd` |
 | Stationary camera | `tools/Start-Duck2-AppConnection.cmd` | Normal companion |
 | Track route with live chat | `tools/Start-Duck2-DrivingMode.cmd` | Normal companion |
-| Current chat scenario | DrivingMode above | `laptop/Start-Duck2-JunctionChatCheck.cmd` |
+| Optional multi-junction chat scenario | DrivingMode above | `laptop/Start-Duck2-JunctionChatCheck.cmd` |
 | Pause check ending at the next red line | DrivingMode above | `laptop/Start-Duck2-PauseCheck.cmd` |
 | Synthetic rehearsal | `py -3 tools/interactive_bench.py` | `laptop/Start-BenchCompanion.cmd` |
 
@@ -82,12 +80,19 @@ interfaces. [BENCH_CHAT_CHECKS](docs/BENCH_CHAT_CHECKS.md) covers isolated testi
 
 ## Evidence and project files
 
-Live-chat software and its command delivery are implemented. The user reported
-the three-second pause check successful. Individual road and intersection
-behaviours have accepted supervised runs. The latest combined chat attempt on
-2026-09-10 looked promising but ended when the battery depleted: it is
-**incomplete, not a successful full-route validation**. Keep software results
-separate from physical observations in [TESTING](docs/TESTING.md).
+Live chat is enabled by default in the normal companion; no scenario launcher
+is required. The user reported the three-second pause check successful, and
+individual road and intersection behaviours have accepted supervised runs.
+The latest 2026-09-10 attempt did not curve enough and stopped. Full-route
+physical validation remains **incomplete**. The software checks cover commands,
+queues, camera previews and stopping; they cannot guarantee lane containment.
+Keep these results separate in [TESTING](docs/TESTING.md).
+
+Project authors: **Tair Kezdekbayev, Alvaro Mendez Li and Tan Kayra Erol**.
+The [DuckietownTUM submission](https://github.com/DuckietownTUM/AlTaTa-Duckietown-Final)
+and [personal mirror](https://github.com/Tair1771/AlTaTa-Duckietown-Final)
+contain the same release. The [report PDF and LaTeX](report/README.md) include
+all three authors.
 
 | Folder/file | Purpose |
 | --- | --- |

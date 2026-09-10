@@ -48,7 +48,17 @@ Start is a high-level request. Displayed wheel values are requests, not proof
 of motion. Status and camera views are separate services; a healthy preview
 does not prove the controller has stayed healthy throughout a run.
 
-## Current chat scenario
+## Optional chat scenarios
+
+The normal companion above is the complete app, with live chat enabled by
+default and no scenario-specific completion limit. The shortcuts below are
+optional rehearsals. They do not replace the normal launcher.
+
+The initial-straight check selects A → E → B and ends at the red line after
+one junction. Sending `go straight at the next junction` changes its finish to
+C. See [the scenario options](LIVE_CHAT.md) before choosing a test shortcut.
+
+### Multi-junction rehearsal
 
 Place duck2 after the curve on the A → E straight, centred in the right lane.
 Open `laptop/Start-Duck2-JunctionChatCheck.cmd` after preparing DrivingMode.

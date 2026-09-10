@@ -28,12 +28,24 @@ class LiveSession:
         self.end_reason = None
         self.stop_at_next_red = False
         self.finish_approach = None
+        self.stop_after_junction = False
+        self.finish_after_junction_red = False
+        self.center_initial_straight = False
 
-    def start(self, run_id, stop_at_next_red=False, finish_approach=None):
+    def start(self, run_id, stop_at_next_red=False, finish_approach=None, stop_after_junction=False,
+              finish_after_junction_red=False, center_initial_straight=False):
         if not isinstance(run_id, str) or not 1 <= len(run_id) <= 100:
             raise ValueError("A run identifier is required")
         if not isinstance(stop_at_next_red, bool):
             raise ValueError("stop_at_next_red must be boolean")
+        if not isinstance(stop_after_junction, bool):
+            raise ValueError("stop_after_junction must be boolean")
+        if stop_after_junction and (stop_at_next_red or finish_approach is not None):
+            raise ValueError("Choose only one run completion condition")
+        if not isinstance(finish_after_junction_red, bool) or not isinstance(center_initial_straight, bool):
+            raise ValueError("Initial-straight and final-red options must be boolean")
+        if finish_after_junction_red and (stop_after_junction or stop_at_next_red or finish_approach is not None):
+            raise ValueError("Choose only one run completion condition")
         finish = (approach_id(*parse_approach(finish_approach))
                   if finish_approach is not None else None)
         if stop_at_next_red and finish is not None:
@@ -43,6 +55,9 @@ class LiveSession:
         self.run_id = run_id
         self.stop_at_next_red = stop_at_next_red
         self.finish_approach = finish
+        self.stop_after_junction = stop_after_junction
+        self.finish_after_junction_red = finish_after_junction_red
+        self.center_initial_straight = center_initial_straight
 
     def end(self, reason):
         self.active = False
@@ -98,7 +113,13 @@ class LiveSession:
         if not self.active:
             return
         self.account_pause(now)
+        if self.stop_after_junction and index >= 2 and state in ("following", "red_stop"):
+            self.end("Single straight crossing complete; outgoing lane reacquired")
+            return
         if state == "red_stop":
+            if self.finish_after_junction_red and index >= 2:
+                self.end("Destination reached at %s red line" % approach)
+                return
             if self.finish_approach is not None and approach == self.finish_approach:
                 self.end("Destination reached at %s red line" % approach)
                 return
@@ -131,6 +152,11 @@ class LiveSession:
             "stop_at_next_red": self.stop_at_next_red,
             "supports_pause_check": True,
             "supports_finish_approach": True,
+            "supports_stop_after_junction": True,
+            "stop_after_junction": self.stop_after_junction,
+            "supports_initial_straight_check": True,
+            "finish_after_junction_red": self.finish_after_junction_red,
+            "center_initial_straight": self.center_initial_straight,
             "finish_approach": self.finish_approach,
             "red_wait_seconds": RED_WAIT_SECONDS,
             "run_id": self.run_id, "profile": self.profile,
